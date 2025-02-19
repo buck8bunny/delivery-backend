@@ -324,6 +324,9 @@ Devise.setup do |config|
     end
   end
   
+# Отключаем flash-сообщения, так как фронтенд — React Native, 
+# а бекенд используется только для API-запросов.
+config.navigational_formats = [:html]
 
     
 end

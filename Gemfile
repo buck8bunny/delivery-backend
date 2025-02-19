@@ -21,6 +21,7 @@ gem "solid_queue"
 gem "solid_cable"
 gem 'devise-jwt'
 gem 'stripe'
+gem 'rack-cors'
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
