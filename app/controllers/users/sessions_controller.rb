@@ -1,11 +1,16 @@
 class Users::SessionsController < Devise::SessionsController
   respond_to :json
+  skip_before_action :authenticate_user!
 
   # Логин с генерацией токена
   def create
     super do |resource|
       if resource.persisted?
-        token = Warden::JWTAuth::UserEncoder.new.call(resource, :user, nil)[0]
+        resource.update!(jti: SecureRandom.uuid) # Обновляем jti
+        
+        payload = { sub: resource.id, jti: resource.jti } # Добавляем jti в токен
+        token = JWT.encode(payload, Rails.application.credentials.secret_key_base, 'HS256')
+  
         refresh_token = generate_refresh_token(resource)
         render json: {
           status: 'success',
@@ -18,7 +23,7 @@ class Users::SessionsController < Devise::SessionsController
       end
     end
   end
-
+  
   # Обновление токена с использованием refresh token
   def refresh
     refresh_token = params[:refresh_token]
@@ -27,9 +32,15 @@ class Users::SessionsController < Devise::SessionsController
       user_id = decoded_token[0]["sub"]
       user = User.find(user_id)
       
-      # Генерация нового токена
-      token = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil)[0]
-      
+      # Проверяем, совпадает ли jti
+      if decoded_token[0]["jti"] != user.jti
+        return render json: { status: 'error', message: 'Invalid refresh token' }, status: :unauthorized
+      end
+  
+      # Генерация нового токена с jti
+      payload = { sub: user.id, jti: user.jti }
+      token = JWT.encode(payload, Rails.application.credentials.secret_key_base, 'HS256')
+  
       render json: {
         status: 'success',
         message: 'Token refreshed successfully',
@@ -40,6 +51,7 @@ class Users::SessionsController < Devise::SessionsController
       render json: { status: 'error', message: 'Invalid refresh token' }, status: :unauthorized
     end
   end
+  
 
   private
 
