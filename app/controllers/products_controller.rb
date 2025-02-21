@@ -16,13 +16,25 @@ class ProductsController < ApplicationController
   # POST /products
   def create
     product = Product.new(product_params)
+    
+    if params[:image] # Если передано изображение
+      uploaded_file = params[:image]
+      file_path = Rails.root.join("public/uploads", uploaded_file.original_filename)
+      
+      File.open(file_path, "wb") do |file|
+        file.write(uploaded_file.read)
+      end
+      
+      product.image_url = "/uploads/#{uploaded_file.original_filename}"
+    end
+  
     if product.save
       render json: product, status: :created
     else
-      render json: { errors: product.errors.full_messages }, status: :unprocessable_entity
+      render json: product.errors, status: :unprocessable_entity
     end
   end
-
+  
   # PATCH/PUT /products/:id
   def update
     if @product.update(product_params)

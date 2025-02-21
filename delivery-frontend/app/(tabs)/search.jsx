@@ -56,7 +56,7 @@ const SearchScreen = () => {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.product} onPress={() => handlePress(item.id)}>
-              <Image source={{ uri: item.image }} style={styles.image} />
+              <Image source={{ uri: item.image_url }} style={styles.image} />
               <Text style={styles.productName}>{item.name}</Text>
               <Text style={styles.productPrice}>{item.price} $</Text>
               <Text style={styles.productDescription}>{item.description}</Text>

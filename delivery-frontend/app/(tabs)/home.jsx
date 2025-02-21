@@ -1,33 +1,79 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { useUser } from "../context/UserContext"; // Импортируем контекст
 
 const HomeScreen = () => {
   const router = useRouter();
+  const { userName, updateUserName } = useUser(); // Используем контекст для имени пользователя
   const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:3000/products") // Заменить на твой API
+    const fetchUserName = async () => {
+      const storedUserName = await AsyncStorage.getItem("userName");
+
+      if (storedUserName) {
+        updateUserName(storedUserName); // Обновляем имя через контекст
+        setIsLoading(false);
+      } else {
+        const token = await AsyncStorage.getItem("token");
+
+        if (token) {
+          try {
+            const response = await fetch("http://localhost:3000/auth/validate", {
+              method: "GET",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            const result = await response.json();
+
+            if (result.valid && result.user) {
+              const name = result.user.name || "";
+              updateUserName(name); // Обновляем имя через контекст
+              await AsyncStorage.setItem("userName", name);
+              setIsLoading(false);
+            }
+          } catch (error) {
+            console.error("Ошибка при получении имени пользователя:", error);
+            setIsLoading(false);
+          }
+        }
+      }
+    };
+
+    fetchUserName();
+
+    fetch("http://localhost:3000/products")
       .then((res) => res.json())
       .then((data) => setProducts(data))
       .catch((err) => console.error(err));
   }, []);
 
   const handlePress = (id) => {
-    router.push(`/product/${id}`); // Переход на страницу продукта
+    router.push(`/product/${id}`);
   };
 
   const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.product} onPress={() => handlePress(item.id)}>
-      <Image source={{ uri: item.image }} style={styles.image} />
+      <Image source={{ uri: item.image_url }} style={styles.image} />
       <Text style={styles.productName}>{item.name}</Text>
       <Text style={styles.productPrice}>{item.price} $</Text>
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Text>Загрузка...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Добро пожаловать!</Text>
+      <Text style={styles.title}>Добро пожаловать, {userName}!</Text>
       <FlatList
         data={products}
         keyExtractor={(item) => item.id.toString()}

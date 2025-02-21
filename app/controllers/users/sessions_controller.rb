@@ -24,6 +24,30 @@ class Users::SessionsController < Devise::SessionsController
     end
   end
   
+  def validate_token
+    token = request.headers['Authorization']&.split(' ')&.last
+  
+    if token.present?
+      begin
+        decoded_token = JWT.decode(token, Rails.application.credentials.secret_key_base, true, algorithm: 'HS256')
+        user_id = decoded_token[0]["sub"]
+        user = User.find_by(id: user_id, jti: decoded_token[0]["jti"]) # Проверяем jti
+  
+        if user
+          render json: { valid: true, user: user }, status: :ok
+        else
+          render json: { valid: false, message: "Invalid token" }, status: :unauthorized
+        end
+      rescue JWT::DecodeError
+        render json: { valid: false, message: "Invalid token" }, status: :unauthorized
+      end
+    else
+      render json: { valid: false, message: "No token provided" }, status: :unauthorized
+    end
+  end
+  
+
+
   # Обновление токена с использованием refresh token
   def refresh
     refresh_token = params[:refresh_token]

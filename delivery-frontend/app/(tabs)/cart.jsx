@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 
 const CartScreen = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
   const fetchCartItems = async () => {
     try {
@@ -40,10 +42,9 @@ const CartScreen = () => {
     }
   };
 
-  // Функция для изменения количества товара
   const updateQuantity = async (cartItemId, newQuantity) => {
     if (newQuantity < 1) {
-      deleteCartItem(cartItemId); // Удаляем, если количество стало 0
+      deleteCartItem(cartItemId);
       return;
     }
 
@@ -59,7 +60,7 @@ const CartScreen = () => {
       });
 
       if (response.ok) {
-        fetchCartItems(); // Обновляем корзину после изменения
+        fetchCartItems();
       } else {
         alert("Не удалось обновить количество товара.");
       }
@@ -68,7 +69,6 @@ const CartScreen = () => {
     }
   };
 
-  // Функция для удаления товара
   const deleteCartItem = async (cartItemId) => {
     try {
       const token = await AsyncStorage.getItem("token");
@@ -80,7 +80,7 @@ const CartScreen = () => {
       });
 
       if (response.ok) {
-        fetchCartItems(); // Обновляем корзину после удаления
+        fetchCartItems();
       } else {
         alert("Не удалось удалить товар.");
       }
@@ -89,12 +89,16 @@ const CartScreen = () => {
     }
   };
 
-  // Загружаем корзину при каждом открытии экрана
   useFocusEffect(
     useCallback(() => {
       fetchCartItems();
     }, [])
   );
+
+  // Подсчет общей суммы корзины
+  const totalAmount = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toFixed(2);
+  }, [cartItems]);
 
   if (loading) {
     return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
@@ -109,29 +113,37 @@ const CartScreen = () => {
       <FlatList
         data={cartItems}
         renderItem={({ item }) => (
-          <View style={styles.cartItem}>
-            <Text style={styles.productName}>{item.product.name}</Text>
-            <Text>{item.product.price} $</Text>
+          <TouchableOpacity onPress={() => router.push(`/product/${item.product.id}`)} >
+            <View style={styles.cartItem}>
+              <Text style={styles.productName}>{item.product.name}</Text>
+              <Text>
+                {item.product.price} $ x {item.quantity} = {(item.product.price * item.quantity).toFixed(2)} $
+              </Text>
 
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity - 1)} style={styles.button}>
-                <Text style={styles.buttonText}>-</Text>
-              </TouchableOpacity>
+              <View style={styles.quantityContainer}>
+                <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity - 1)} style={styles.button}>
+                  <Text style={styles.buttonText}>-</Text>
+                </TouchableOpacity>
 
-              <Text style={styles.quantity}>{item.quantity}</Text>
+                <Text style={styles.quantity}>{item.quantity}</Text>
 
-              <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity + 1)} style={styles.button}>
-                <Text style={styles.buttonText}>+</Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity + 1)} style={styles.button}>
+                  <Text style={styles.buttonText}>+</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => deleteCartItem(item.id)} style={styles.deleteButton}>
-                <Text style={styles.deleteText}>Удалить</Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteCartItem(item.id)} style={styles.deleteButton}>
+                  <Text style={styles.deleteText}>Удалить</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         keyExtractor={(item) => item.id.toString()}
       />
+
+      <View style={styles.totalContainer}>
+        <Text style={styles.totalText}>Общая сумма: {totalAmount} $</Text>
+      </View>
     </View>
   );
 };
@@ -193,6 +205,16 @@ const styles = StyleSheet.create({
     color: "red",
     textAlign: "center",
     marginTop: 20,
+  },
+  totalContainer: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    marginTop: 10,
+  },
+  totalText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "right",
   },
 });
 

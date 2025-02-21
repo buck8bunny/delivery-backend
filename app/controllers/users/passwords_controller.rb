@@ -1,34 +1,36 @@
-# frozen_string_literal: true
-
 class Users::PasswordsController < Devise::PasswordsController
-  # GET /resource/password/new
+  before_action :authenticate_user!
+  
+  # Обновление пароля через текущий пароль и новый пароль
+  def update
+    user = current_user
+
+    # Проверяем текущий пароль с помощью valid_password?
+    if user.valid_password?(params[:current_password])
+      if user.update(password: params[:new_password], password_confirmation: params[:new_password_confirmation])
+        render json: { success: true, message: "Пароль успешно обновлен" }
+      else
+        render json: { success: false, message: "Ошибка при обновлении пароля" }, status: :unprocessable_entity
+      end
+    else
+      render json: { success: false, message: "Неверный текущий пароль" }, status: :unprocessable_entity
+    end
+  end
+
+  # Остальные методы можно оставить закомментированными или удалить, если не используете их
   # def new
   #   super
   # end
 
-  # POST /resource/password
   # def create
   #   super
   # end
 
-  # GET /resource/password/edit?reset_password_token=abcdef
   # def edit
   #   super
   # end
 
-  # PUT /resource/password
   # def update
   #   super
-  # end
-
-  # protected
-
-  # def after_resetting_password_path_for(resource)
-  #   super(resource)
-  # end
-
-  # The path used after sending reset password instructions
-  # def after_sending_reset_password_instructions_path_for(resource_name)
-  #   super(resource_name)
   # end
 end

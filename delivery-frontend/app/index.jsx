@@ -5,10 +5,10 @@ import AuthScreen from './auth';
 
 const App = () => {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <AuthScreen />
-      <StatusBar style="auto" />
-    </SafeAreaView>
+      <SafeAreaView style={{ flex: 1 }}>
+        <AuthScreen />
+        <StatusBar style="auto" />
+      </SafeAreaView>
   );
 };
 
