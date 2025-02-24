@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const AddToCartButton = ({ productId }) => {
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,7 @@ const AddToCartButton = ({ productId }) => {
         const token = await AsyncStorage.getItem("token");
         if (!token) return;
 
-        const response = await fetch("http://localhost:3000/cart_items", {
+        const response = await fetch(`${API_URL}/cart_items`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -46,7 +47,7 @@ const AddToCartButton = ({ productId }) => {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/cart_items", {
+      const response = await fetch(`${API_URL}/cart_items`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

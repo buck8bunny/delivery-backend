@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import { Text } from "react-native";
 
 // Создаем контекст
 const UserContext = createContext();
@@ -20,3 +21,5 @@ export const UserProvider = ({ children }) => {
     </UserContext.Provider>
   );
 };
+
+export default UserProvider; 

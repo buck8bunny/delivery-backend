@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity }
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+
 
 const CartScreen = () => {
   const [cartItems, setCartItems] = useState([]);
@@ -19,7 +22,7 @@ const CartScreen = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/cart_items", {
+      const response = await fetch(`${API_URL}/cart_items`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -50,7 +53,7 @@ const CartScreen = () => {
 
     try {
       const token = await AsyncStorage.getItem("token");
-      const response = await fetch(`http://localhost:3000/cart_items/${cartItemId}`, {
+      const response = await fetch(`${API_URL}/cart_items/${cartItemId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -72,7 +75,7 @@ const CartScreen = () => {
   const deleteCartItem = async (cartItemId) => {
     try {
       const token = await AsyncStorage.getItem("token");
-      const response = await fetch(`http://localhost:3000/cart_items/${cartItemId}`, {
+      const response = await fetch(`${API_URL}/cart_items/${cartItemId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -143,6 +146,11 @@ const CartScreen = () => {
 
       <View style={styles.totalContainer}>
         <Text style={styles.totalText}>Общая сумма: {totalAmount} $</Text>
+
+        {/* Кнопка "Оплатить" */}
+        <TouchableOpacity style={styles.payButton} onPress={() => router.push("/checkout")}>
+          <Text style={styles.payButtonText}>Оплатить</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -206,15 +214,30 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
   },
-  totalContainer: {
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    marginTop: 10,
+  totalContainer: { 
+    paddingVertical: 10, 
+    borderTopWidth: 1, 
+    marginTop: 10, 
+    alignItems: "center" 
   },
   totalText: {
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "right",
+  },
+
+   // Стиль для кнопки "Оплатить"
+   payButton: {
+    marginTop:10,
+    backgroundColor: "green",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+  },
+  payButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
 

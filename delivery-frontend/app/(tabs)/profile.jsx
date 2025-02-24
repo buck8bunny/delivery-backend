@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import EditableField from "../components/EditableField";
 import { useUser } from "../context/UserContext"; // Импортируем контекст
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function ProfileScreen() {
   const { updateUserName } = useUser(); // Используем контекст для обновления имени
@@ -21,7 +22,7 @@ export default function ProfileScreen() {
 
       if (token) {
         try {
-          const response = await fetch("http://localhost:3000/auth/validate", {
+          const response = await fetch(`${API_URL}/auth/validate`, {
             method: "GET",
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -54,7 +55,7 @@ export default function ProfileScreen() {
 
       if (editing === "name") {
         // Изменение имени без пароля
-        endpoint = "http://localhost:3000/users/update_name";
+        endpoint = `${API_URL}/users/update_name`;
         bodyData = { name: userName };
       } else if (editing === "email" && newEmail) {
         // Изменение почты требует текущий пароль
@@ -62,7 +63,7 @@ export default function ProfileScreen() {
           setErrorMessage("Введите текущий пароль.");
           return;
         }
-        endpoint = "http://localhost:3000/users/update_email";
+        endpoint = `${API_URL}/users/update_email`;
         bodyData = { email: newEmail, password: currentPassword };
       } else if (editing === "password" && newPassword) {
         // Изменение пароля требует текущий пароль
@@ -70,7 +71,7 @@ export default function ProfileScreen() {
           setErrorMessage("Введите текущий пароль.");
           return;
         }
-        endpoint = "http://localhost:3000/users/password/update";
+        endpoint = `${API_URL}/users/password/update`;
         bodyData = { current_password: currentPassword, new_password: newPassword };
       } else {
         setErrorMessage("Пожалуйста, заполните все поля.");

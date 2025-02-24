@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router"; // Для перехода на другую страницу
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const SearchScreen = () => {
   const router = useRouter();
@@ -10,7 +11,7 @@ const SearchScreen = () => {
 
   // Загружаем товары при первом рендере
   useEffect(() => {
-    fetch("http://localhost:3000/products") // Заменить на твой API
+    fetch(`${API_URL}/products`) // Заменить на твой API
       .then((res) => res.json())
       .then((data) => {
         setProducts(data);

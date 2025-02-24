@@ -40,6 +40,17 @@ class CartItemsController < ApplicationController
     cart_item.destroy
     render json: { status: 'success', message: 'Товар удалён из корзины' }
   end
+
+   # Получить общую сумму корзины
+  def cart_total
+    # Получаем все товары из корзины текущего пользователя
+    cart_items = current_user.cart_items.includes(:product)
+
+    # Вычисляем общую сумму
+    total = cart_items.sum { |item| item.product.price * item.quantity }
+
+    render json: { total: total }, status: :ok
+  end
 end
 
 

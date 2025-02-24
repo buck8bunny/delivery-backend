@@ -22,9 +22,13 @@ Rails.application.routes.draw do
 
   end
 
+
+
   resources :products, only: [:index, :show, :create, :update, :destroy]
   resources :orders, only: [:index, :show, :create, :update, :destroy]
   resources :cart_items, only: [:index, :create, :update, :destroy]
+
+  get 'cart_total', to: 'cart_items#cart_total'
   post '/stripe/webhook', to: 'payments#webhook'
 
 

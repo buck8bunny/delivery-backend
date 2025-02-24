@@ -6,7 +6,7 @@
 # Read more: https://github.com/cyu/rack-cors
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins 'http://localhost:8081',  'http://localhost:3000', 'exp://192.168.0.178:8081', 'http://192.168.0.178:8081','https://192.168.0.178:8081', 'https://localhost:8081'
+    origins ENV['NGROK_URL'], 'http://localhost:8081', 'http://0.0.0.0:3000', 'http://172.29.250.136:3000', 'http://localhost:3000', 'exp://192.168.0.178:8081', 'http://192.168.0.178:8081','https://192.168.0.178:8081', 'https://localhost:8081'
 
     resource '*',
       headers: :any,

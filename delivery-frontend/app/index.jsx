@@ -6,7 +6,7 @@ import AuthScreen from './auth';
 const App = () => {
   return (
       <SafeAreaView style={{ flex: 1 }}>
-        <AuthScreen />
+        <AuthScreen/>
         <StatusBar style="auto" />
       </SafeAreaView>
   );

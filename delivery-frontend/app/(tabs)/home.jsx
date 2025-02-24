@@ -3,6 +3,8 @@ import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from "react
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useUser } from "../context/UserContext"; // Импортируем контекст
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 
 const HomeScreen = () => {
   const router = useRouter();
@@ -22,7 +24,7 @@ const HomeScreen = () => {
 
         if (token) {
           try {
-            const response = await fetch("http://localhost:3000/auth/validate", {
+            const response = await fetch(`${API_URL}/auth/validate`, {
               method: "GET",
               headers: { Authorization: `Bearer ${token}` },
             });
@@ -45,7 +47,7 @@ const HomeScreen = () => {
 
     fetchUserName();
 
-    fetch("http://localhost:3000/products")
+    fetch(`${API_URL}/products`)
       .then((res) => res.json())
       .then((data) => setProducts(data))
       .catch((err) => console.error(err));

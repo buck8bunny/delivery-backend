@@ -15,22 +15,31 @@ class OrdersController < ApplicationController
 
   # POST /orders
   def create
+    Rails.logger.info "Creating order with params: #{order_params.inspect}"
     order = current_user.orders.new(order_params.merge(status: 'pending'))
   
     Stripe.api_key = Rails.application.credentials.dig(:stripe, :secret_key)
   
-    payment_intent = Stripe::PaymentIntent.create({
-      amount: (order.total * 100).to_i, # Конвертация в центы
-      currency: 'usd',
-      metadata: { order_id: order.id, user_id: current_user.id }
-    })
-  
-    order.payment_intent_id = payment_intent.id
-  
-    if order.save
-      render json: { order: order, client_secret: payment_intent.client_secret }, status: :created
-    else
-      render json: { errors: order.errors.full_messages }, status: :unprocessable_entity
+    begin
+      payment_intent = Stripe::PaymentIntent.create({
+        amount: (order.total * 100).to_i, # Конвертация в центы
+        currency: 'usd',
+        metadata: { order_id: order.id, user_id: current_user.id }
+      })
+    
+      Rails.logger.info "Payment intent created: #{payment_intent.inspect}"
+    
+      order.payment_intent_id = payment_intent.id
+    
+      if order.save
+        render json: { order: order, client_secret: payment_intent.client_secret }, status: :created
+      else
+        Rails.logger.error "Order save failed: #{order.errors.full_messages}"
+        render json: { errors: order.errors.full_messages }, status: :unprocessable_entity
+      end
+    rescue Stripe::StripeError => e
+      Rails.logger.error "Stripe error: #{e.message}"
+      render json: { error: e.message }, status: :unprocessable_entity
     end
   end
   

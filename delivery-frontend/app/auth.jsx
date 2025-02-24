@@ -10,6 +10,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -26,7 +28,7 @@ const AuthScreen = () => {
       const token = await AsyncStorage.getItem("token");
       if (token) {
         try {
-          const response = await fetch("http://localhost:3000/auth/validate", {
+          const response = await fetch(`${API_URL}/auth/validate`, {
             method: "GET",
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -57,8 +59,8 @@ const AuthScreen = () => {
     }
   
     const url = isLogin
-      ? "http://localhost:3000/users/sign_in"
-      : "http://localhost:3000/users";
+      ? `${API_URL}/users/sign_in`
+      : `${API_URL}/users`;
   
     const data = new URLSearchParams();
     data.append("user[email]", email);

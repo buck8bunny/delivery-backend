@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import AddToCartButton from "../components/AddToCartButton";
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const ProductDetailScreen = () => {
   const { id } = useLocalSearchParams();
@@ -9,7 +10,7 @@ const ProductDetailScreen = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`http://localhost:3000/products/${id}`)
+    fetch(`${API_URL}/products/${id}`)
       .then((res) => res.json())
       .then((data) => {
         setProduct(data);
