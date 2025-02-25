@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Button, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import EditableField from "../components/EditableField";
-import { useUser } from "../context/UserContext"; // Импортируем контекст
+import { useUser } from "../context/UserContext";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function ProfileScreen() {
-  const { updateUserName } = useUser(); // Используем контекст для обновления имени
+  const { updateUserName } = useUser();
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -15,34 +25,39 @@ export default function ProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [editing, setEditing] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUserData = async () => {
-      const token = await AsyncStorage.getItem("token");
-
-      if (token) {
-        try {
-          const response = await fetch(`${API_URL}/auth/validate`, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const result = await response.json();
-          if (result.valid && result.user) {
-            setUserName(result.user.name);
-            setEmail(result.user.email);
-          }
-        } catch (error) {
-          console.error("Ошибка при загрузке данных пользователя:", error);
-        }
-      }
-    };
-
     loadUserData();
   }, []);
 
+  const loadUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        router.replace("/");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/auth/validate`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+      
+      if (result.valid && result.user) {
+        setUserName(result.user.name);
+        setEmail(result.user.email);
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке данных:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem("token");
-    router.push("/");
+    router.replace("/");
   };
 
   const handleSaveChanges = async () => {
@@ -54,27 +69,24 @@ export default function ProfileScreen() {
       let bodyData = {};
 
       if (editing === "name") {
-        // Изменение имени без пароля
         endpoint = `${API_URL}/users/update_name`;
         bodyData = { name: userName };
       } else if (editing === "email" && newEmail) {
-        // Изменение почты требует текущий пароль
         if (!currentPassword) {
-          setErrorMessage("Введите текущий пароль.");
+          setErrorMessage("Введите текущий пароль");
           return;
         }
         endpoint = `${API_URL}/users/update_email`;
         bodyData = { email: newEmail, password: currentPassword };
       } else if (editing === "password" && newPassword) {
-        // Изменение пароля требует текущий пароль
         if (!currentPassword) {
-          setErrorMessage("Введите текущий пароль.");
+          setErrorMessage("Введите текущий пароль");
           return;
         }
         endpoint = `${API_URL}/users/password/update`;
         bodyData = { current_password: currentPassword, new_password: newPassword };
       } else {
-        setErrorMessage("Пожалуйста, заполните все поля.");
+        setErrorMessage("Пожалуйста, заполните все поля");
         return;
       }
 
@@ -88,9 +100,10 @@ export default function ProfileScreen() {
       });
 
       const result = await response.json();
-      if (result.success) {
+      
+      if (response.ok) {
         if (editing === "name") {
-          updateUserName(userName); // Обновляем имя через контекст
+          updateUserName(userName);
           await AsyncStorage.setItem("userName", userName);
         } else if (editing === "email") {
           setEmail(newEmail);
@@ -100,71 +113,294 @@ export default function ProfileScreen() {
         setNewPassword("");
         setNewEmail("");
       } else {
-        setErrorMessage(result.message || "Ошибка при обновлении данных.");
+        setErrorMessage(result.message || "Ошибка при обновлении данных");
       }
     } catch (error) {
       console.error("Ошибка при обновлении данных:", error);
+      setErrorMessage("Произошла ошибка при обновлении данных");
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Профиль</Text>
-
-      <EditableField
-        label="Имя"
-        value={userName}
-        isEditing={editing === "name"}
-        onEdit={() => setEditing("name")}
-        onChange={setUserName}
-        placeholder="Введите имя"
-      />
-
-      <EditableField
-        label="Почта"
-        value={editing === "email" ? newEmail : email} // Показываем старую почту до редактирования
-        isEditing={editing === "email"}
-        onEdit={() => {
-          setNewEmail(email); // Устанавливаем старую почту перед редактированием
-          setEditing("email");
-        }}
-        onChange={setNewEmail}
-        placeholder="Введите новую почту"
-      />
-
-
-      <EditableField
-        label="Пароль"
-        value=""
-        isEditing={editing === "password"}
-        onEdit={() => setEditing("password")}
-        onChange={setNewPassword}
-        placeholder="Введите новый пароль"
-        secureTextEntry
-      />
-
-      {editing &&  editing !== "name" && (
-        <EditableField
-          label="Текущий пароль"
-          value={currentPassword}
-          isEditing={true}
-          onChange={setCurrentPassword}
-          placeholder="Введите текущий пароль"
-          secureTextEntry
-        />
-      )}
-
-      {errorMessage && <Text style={styles.errorMessage}>{errorMessage}</Text>}
-
-      {editing && <Button title="Сохранить изменения" onPress={handleSaveChanges} />}
-      <Button  title="Выйти" onPress={handleLogout} />
+  const renderSection = (title, value, onEdit, isPassword = false) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionContent}>
+        <Text style={styles.sectionValue}>
+          {isPassword ? "••••••••" : value}
+        </Text>
+        <TouchableOpacity onPress={onEdit} style={styles.editButton}>
+          <Ionicons name="pencil" size={20} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
     </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {userName?.charAt(0)?.toUpperCase() || "?"}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.welcomeText}>Добро пожаловать,</Text>
+        <Text style={styles.userName}>{userName}</Text>
+      </View>
+
+      <View style={styles.content}>
+        {editing ? (
+          <View style={styles.editingContainer}>
+            <Text style={styles.editingTitle}>
+              {editing === "name" ? "Изменение имени" :
+               editing === "email" ? "Изменение почты" :
+               "Изменение пароля"}
+            </Text>
+            
+            {editing === "name" && (
+              <EditableField
+                label="Новое имя"
+                value={userName}
+                onChange={setUserName}
+                placeholder="Введите новое имя"
+              />
+            )}
+
+            {editing === "email" && (
+              <EditableField
+                label="Новая почта"
+                value={newEmail}
+                onChange={setNewEmail}
+                placeholder="Введите новую почту"
+              />
+            )}
+
+            {editing === "password" && (
+              <EditableField
+                label="Новый пароль"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="Введите новый пароль"
+                secureTextEntry
+              />
+            )}
+
+            {editing !== "name" && (
+              <EditableField
+                label="Текущий пароль"
+                value={currentPassword}
+                onChange={setCurrentPassword}
+                placeholder="Введите текущий пароль"
+                secureTextEntry
+              />
+            )}
+
+            {errorMessage && (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            )}
+
+            <View style={styles.editingButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setEditing(null);
+                  setErrorMessage("");
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setNewEmail("");
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Отмена</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton]}
+                onPress={handleSaveChanges}
+              >
+                <Text style={styles.saveButtonText}>Сохранить</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            {renderSection("Имя", userName, () => setEditing("name"))}
+            {renderSection("Почта", email, () => setEditing("email"))}
+            {renderSection("Пароль", "••••••••", () => setEditing("password"), true)}
+            
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+              <Text style={styles.logoutText}>Выйти</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
-  errorMessage: { color: "red", fontSize: 14, marginBottom: 10 },
- 
+  container: {
+    flex: 1,
+    backgroundColor: "#F2F2F7",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F2F2F7",
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 30,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 40,
+    color: "white",
+    fontWeight: "bold",
+  },
+  welcomeText: {
+    fontSize: 17,
+    color: "#666",
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  content: {
+    padding: 16,
+    paddingTop: 24,
+  },
+  section: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  sectionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionValue: {
+    fontSize: 17,
+    color: "#000",
+    flex: 1,
+  },
+  editButton: {
+    padding: 8,
+  },
+  editingContainer: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  editingTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 16,
+    color: "#000",
+  },
+  editingButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  button: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#F2F2F7",
+    marginRight: 8,
+  },
+  saveButton: {
+    backgroundColor: "#007AFF",
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  saveButtonText: {
+    color: "white",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFE5E5",
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 24,
+  },
+  logoutText: {
+    color: "#FF3B30",
+    fontSize: 17,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
 });

@@ -1,29 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from "react-native";
-import { useRouter } from "expo-router"; // Для перехода на другую страницу
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  FlatList, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Image,
+  ActivityIndicator 
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const SearchScreen = () => {
   const router = useRouter();
-  const [products, setProducts] = useState([]); // Все товары
-  const [searchText, setSearchText] = useState(""); // Текст поиска
-  const [filteredProducts, setFilteredProducts] = useState([]); // Отфильтрованные товары
+  const [products, setProducts] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Загружаем товары при первом рендере
   useEffect(() => {
-    fetch(`${API_URL}/products`) // Заменить на твой API
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(data);
-        setFilteredProducts(data); // Изначально показываем все товары
-      })
-      .catch((err) => console.error(err));
+    fetchProducts();
   }, []);
 
-  // Обрабатываем текст поиска
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(`${API_URL}/products`);
+      const data = await response.json();
+      setProducts(data);
+      setFilteredProducts(data);
+    } catch (err) {
+      console.error("Ошибка загрузки товаров:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearch = (text) => {
     setSearchText(text);
-    // Фильтруем товары по названию и описанию
     const filtered = products.filter(
       (product) =>
         product.name.toLowerCase().includes(text.toLowerCase()) ||
@@ -32,37 +49,85 @@ const SearchScreen = () => {
     setFilteredProducts(filtered);
   };
 
-  // Обрабатываем нажатие на карточку товара
   const handlePress = (id) => {
-    router.push(`/product/${id}`); // Переход на страницу продукта
+    router.push(`/product/${id}`);
   };
+
+  const renderProduct = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.productCard}
+      onPress={() => handlePress(item.id)}
+      activeOpacity={0.7}
+    >
+      <Image 
+        source={{ uri: item.image_url }} 
+        style={styles.productImage}
+        defaultSource={require("../../assets/placeholder.png")}
+      />
+      <View style={styles.productInfo}>
+        <Text style={styles.productName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={styles.productDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+        <Text style={styles.productPrice}>
+          ${item.price}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Поиск товара</Text>
-      {/* Поле для ввода текста */}
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Введите название или описание товара"
-        value={searchText}
-        onChangeText={handleSearch} // Вызываем фильтрацию при изменении текста
-      />
+      <Text style={styles.title}>Поиск</Text>
+      
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Поиск товаров..."
+          placeholderTextColor="#999"
+          value={searchText}
+          onChangeText={handleSearch}
+        />
+        {searchText !== "" && (
+          <TouchableOpacity 
+            onPress={() => handleSearch("")}
+            style={styles.clearButton}
+          >
+            <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* Если товары не найдены */}
       {filteredProducts.length === 0 ? (
-        <Text style={styles.noResults}>Товары не найдены</Text>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="search-outline" size={64} color="#CCC" />
+          <Text style={styles.noResults}>
+            {searchText === "" ? "Начните поиск" : "Товары не найдены"}
+          </Text>
+          <Text style={styles.noResultsSubtext}>
+            {searchText === "" 
+              ? "Введите название или описание товара"
+              : "Попробуйте изменить параметры поиска"}
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filteredProducts}
+          renderItem={renderProduct}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.product} onPress={() => handlePress(item.id)}>
-              <Image source={{ uri: item.image_url }} style={styles.image} />
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productPrice}>{item.price} $</Text>
-              <Text style={styles.productDescription}>{item.description}</Text>
-            </TouchableOpacity>
-          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.productList}
         />
       )}
     </View>
@@ -72,57 +137,109 @@ const SearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#F2F2F7",
+    paddingTop: 60,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F2F2F7",
   },
   title: {
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: "bold",
+    marginBottom: 20,
+    paddingHorizontal: 16,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    marginHorizontal: 16,
     marginBottom: 16,
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  noResults: {
-    fontSize: 18,
-    color: "red",
-    textAlign: "center",
-    marginTop: 20,
-  },
-  product: {
     flex: 1,
-    margin: 8,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    elevation: 3,
-    padding: 10,
-    alignItems: "center",
+    fontSize: 17,
+    color: "#000",
+    padding: 0,
   },
-  image: {
-    width: "100%",
-    height: 150,
-    borderRadius: 10,
+  clearButton: {
+    padding: 4,
+  },
+  productList: {
+    padding: 16,
+  },
+  productCard: {
+    flexDirection: "row",
+    backgroundColor: "white",
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  productImage: {
+    width: 120,
+    height: 120,
+  },
+  productInfo: {
+    flex: 1,
+    padding: 16,
+    justifyContent: "space-between",
   },
   productName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
-  productPrice: {
-    fontSize: 14,
-    color: "#888",
-    marginTop: 4,
+    fontSize: 17,
+    fontWeight: "600",
+    marginBottom: 4,
   },
   productDescription: {
-    fontSize: 12,
+    fontSize: 15,
     color: "#666",
-    marginTop: 8,
+    marginBottom: 8,
+  },
+  productPrice: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  noResults: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#666",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    fontSize: 15,
+    color: "#999",
     textAlign: "center",
-    paddingHorizontal: 10,
   },
 });
 

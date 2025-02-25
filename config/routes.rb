@@ -1,8 +1,10 @@
 Rails.application.routes.draw do
-  devise_for :users, controllers: {
-    sessions: 'users/sessions',
-    registrations: 'users/registrations'
-  }
+  devise_for :users, 
+    controllers: {
+      sessions: 'users/sessions',
+      registrations: 'users/registrations'
+    },
+    defaults: { format: :json }
 
   # Оборачиваем маршрут refresh в devise_scope
   devise_scope :user do
@@ -21,6 +23,8 @@ Rails.application.routes.draw do
     patch '/users/password/update', to: 'users/passwords#update'
 
     post '/payment-sheet', to: 'payments#payment_sheet'
+
+    get '/users/profile', to: 'users/registrations#profile'
   end
 
   # Перемещаем payment-sheet маршрут за пределы devise_scope

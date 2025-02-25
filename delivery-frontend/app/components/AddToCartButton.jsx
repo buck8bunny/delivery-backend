@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { 
+  TouchableOpacity, 
+  Text, 
+  StyleSheet, 
+  ActivityIndicator, 
+  View,
+  Animated,
+  Platform 
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const AddToCartButton = ({ productId }) => {
+const AddToCartButton = ({ productId, mini = false }) => {
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
+  const [animation] = useState(new Animated.Value(1));
 
   useEffect(() => {
     const checkCart = async () => {
@@ -35,11 +44,28 @@ const AddToCartButton = ({ productId }) => {
     checkCart();
   }, [productId]);
 
+  const animateButton = () => {
+    Animated.sequence([
+      Animated.timing(animation, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   const handleAddToCart = async () => {
     if (added) return;
 
     try {
       setLoading(true);
+      animateButton();
+      
       const token = await AsyncStorage.getItem("token");
 
       if (!token) {
@@ -71,49 +97,118 @@ const AddToCartButton = ({ productId }) => {
     }
   };
 
+  if (mini) {
+    return (
+      <Animated.View style={{ transform: [{ scale: animation }] }}>
+        <TouchableOpacity
+          style={[styles.miniButton, added && styles.buttonAdded]}
+          onPress={handleAddToCart}
+          disabled={loading || added}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : added ? (
+            <Icon name="check" size={20} color="white" />
+          ) : (
+            <Icon name="add-shopping-cart" size={20} color="white" />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+
   return (
-    <TouchableOpacity
-      style={[styles.button, added && styles.buttonAdded]}
-      onPress={handleAddToCart}
-      disabled={loading || added}
-    >
-      {loading ? (
-        <>
-          <ActivityIndicator size="small" color="white" />
-          <Text style={styles.text}>Добавление...</Text>
-        </>
-      ) : added ? (
-        <>
-          <Icon name="check" size={24} color="white" />
-          <Text style={styles.text}>Добавлено</Text>
-        </>
-      ) : (
-        <>
-          <Icon name="shopping-cart" size={24} color="white" />
-          <Text style={styles.text}>Добавить в корзину</Text>
-        </>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale: animation }] }}>
+      <TouchableOpacity
+        style={[styles.button, added && styles.buttonAdded]}
+        onPress={handleAddToCart}
+        disabled={loading || added}
+        activeOpacity={0.8}
+      >
+        <View style={styles.buttonContent}>
+          {loading ? (
+            <>
+              <ActivityIndicator size="small" color="white" style={styles.icon} />
+              <Text style={styles.text}>Добавление...</Text>
+            </>
+          ) : added ? (
+            <>
+              <Icon name="check" size={24} color="white" style={styles.icon} />
+              <Text style={styles.text}>В корзине</Text>
+            </>
+          ) : (
+            <>
+              <Icon name="shopping-cart" size={24} color="white" style={styles.icon} />
+              <Text style={styles.text}>Добавить в корзину</Text>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    justifyContent: "center",
+    backgroundColor: "#007AFF",
+    borderRadius: 16,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#007AFF",
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   buttonAdded: {
-    backgroundColor: "#888", // Серый цвет, если товар уже добавлен
+    backgroundColor: "#34C759",
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  icon: {
+    marginRight: 8,
   },
   text: {
     color: "white",
-    fontSize: 18,
-    marginLeft: 8,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  miniButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#007AFF",
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
 });
 

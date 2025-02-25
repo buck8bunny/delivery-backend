@@ -1,15 +1,27 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+  Animated,
+  Platform,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-
 
 const CartScreen = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteAnimation] = useState(new Animated.Value(1));
   const navigation = useNavigation();
 
   const fetchCartItems = async () => {
@@ -103,55 +115,122 @@ const CartScreen = () => {
     return cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toFixed(2);
   }, [cartItems]);
 
+  const renderCartItem = ({ item }) => (
+    <Animated.View
+      style={[
+        styles.cartItem,
+        {
+          opacity: deleteAnimation,
+          transform: [
+            {
+              scale: deleteAnimation,
+            },
+          ],
+        },
+      ]}
+    >
+      <Image
+        source={{ uri: item.product.image_url }}
+        style={styles.productImage}
+        defaultSource={require("../../assets/placeholder.png")}
+      />
+      
+      <View style={styles.productInfo}>
+        <Text style={styles.productName}>{item.product.name}</Text>
+        <Text style={styles.productPrice}>${item.product.price}</Text>
+        
+        <View style={styles.quantityContainer}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => updateQuantity(item.id, item.quantity - 1)}
+          >
+            <Ionicons name="remove" size={20} color="#007AFF" />
+          </TouchableOpacity>
+
+          <Text style={styles.quantity}>{item.quantity}</Text>
+
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => updateQuantity(item.id, item.quantity + 1)}
+          >
+            <Ionicons name="add" size={20} color="#007AFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteCartItem(item.id)}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
   if (loading) {
-    return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
   }
 
   if (!cartItems.length) {
-    return <Text style={styles.errorText}>Корзина пуста</Text>;
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="cart-outline" size={80} color="#999" />
+        <Text style={styles.emptyText}>Ваша корзина пуста</Text>
+        <TouchableOpacity
+          style={styles.shopButton}
+          onPress={() => router.push("/home")}
+        >
+          <Text style={styles.shopButtonText}>Перейти к покупкам</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Корзина</Text>
+      
       <FlatList
         data={cartItems}
-        renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => router.push(`/product/${item.product.id}`)} >
-            <View style={styles.cartItem}>
-              <Text style={styles.productName}>{item.product.name}</Text>
-              <Text>
-                {item.product.price} $ x {item.quantity} = {(item.product.price * item.quantity).toFixed(2)} $
-              </Text>
-
-              <View style={styles.quantityContainer}>
-                <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity - 1)} style={styles.button}>
-                  <Text style={styles.buttonText}>-</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.quantity}>{item.quantity}</Text>
-
-                <TouchableOpacity onPress={() => updateQuantity(item.id, item.quantity + 1)} style={styles.button}>
-                  <Text style={styles.buttonText}>+</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => deleteCartItem(item.id)} style={styles.deleteButton}>
-                  <Text style={styles.deleteText}>Удалить</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
+        renderItem={renderCartItem}
         keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
       />
 
-      <View style={styles.totalContainer}>
-        <Text style={styles.totalText}>Общая сумма: {totalAmount} $</Text>
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={80} style={styles.bottomContainer}>
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalLabel}>Итого:</Text>
+            <Text style={styles.totalAmount}>${totalAmount}</Text>
+          </View>
 
-        {/* Кнопка "Оплатить" */}
-        <TouchableOpacity style={styles.payButton} onPress={() => router.push("/checkout")}>
-          <Text style={styles.payButtonText}>Оплатить</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.checkoutButton}
+            onPress={() => router.push("/checkout")}
+          >
+            <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
+          </TouchableOpacity>
+        </BlurView>
+      ) : (
+        <View style={[styles.bottomContainer, { backgroundColor: 'white' }]}>
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalLabel}>Итого:</Text>
+            <Text style={styles.totalAmount}>${totalAmount}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.checkoutButton}
+            onPress={() => router.push("/checkout")}
+          >
+            <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -159,85 +238,139 @@ const CartScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    backgroundColor: "#F2F2F7",
+    paddingTop: 60,
   },
-  loader: {
+  centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#F2F2F7",
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: "bold",
+    marginBottom: 20,
+    paddingHorizontal: 16,
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 100,
   },
   cartItem: {
+    flexDirection: "row",
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 16,
-    borderBottomWidth: 1,
-    paddingBottom: 8,
-    paddingHorizontal: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  productImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  productInfo: {
+    flex: 1,
   },
   productName: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "600",
     marginBottom: 4,
+  },
+  productPrice: {
+    fontSize: 15,
+    color: "#007AFF",
+    fontWeight: "600",
+    marginBottom: 12,
   },
   quantityContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
   },
-  button: {
-    backgroundColor: "#ddd",
+  quantityButton: {
+    backgroundColor: "#F2F2F7",
+    borderRadius: 8,
     padding: 8,
-    borderRadius: 5,
-    marginHorizontal: 5,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: "bold",
   },
   quantity: {
-    fontSize: 18,
-    fontWeight: "bold",
-    minWidth: 30,
-    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "600",
+    marginHorizontal: 16,
   },
   deleteButton: {
-    marginLeft: 20,
-    backgroundColor: "red",
+    marginLeft: "auto",
+    backgroundColor: "#FFE5E5",
+    borderRadius: 8,
     padding: 8,
-    borderRadius: 5,
   },
-  deleteText: {
-    color: "white",
-    fontWeight: "bold",
+  emptyText: {
+    fontSize: 17,
+    color: "#999",
+    marginTop: 16,
+    marginBottom: 24,
   },
-  errorText: {
-    fontSize: 18,
-    color: "red",
-    textAlign: "center",
-    marginTop: 20,
-  },
-  totalContainer: { 
-    paddingVertical: 10, 
-    borderTopWidth: 1, 
-    marginTop: 10, 
-    alignItems: "center" 
-  },
-  totalText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "right",
-  },
-
-   // Стиль для кнопки "Оплатить"
-   payButton: {
-    marginTop:10,
-    backgroundColor: "green",
+  shopButton: {
+    backgroundColor: "#007AFF",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    paddingHorizontal: 24,
+    borderRadius: 12,
   },
-  payButtonText: {
+  shopButtonText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  bottomContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 17,
+    color: "#666",
+  },
+  totalAmount: {
+    fontSize: 24,
     fontWeight: "bold",
+  },
+  checkoutButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+  },
+  checkoutButtonText: {
+    color: "white",
+    fontSize: 17,
+    fontWeight: "600",
   },
 });
 

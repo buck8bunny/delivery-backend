@@ -1,26 +1,23 @@
-class Users::SessionsController < Devise::SessionsController
+class Users::SessionsController < ApplicationController
   respond_to :json
   skip_before_action :authenticate_user!
 
   # Логин с генерацией токена
   def create
-    super do |resource|
-      if resource.persisted?
-        resource.update!(jti: SecureRandom.uuid) # Обновляем jti
-        
-        payload = { sub: resource.id, jti: resource.jti } # Добавляем jti в токен
-        token = JWT.encode(payload, Rails.application.credentials.secret_key_base, 'HS256')
-  
-        refresh_token = generate_refresh_token(resource)
-        render json: {
-          status: 'success',
-          message: 'Logged in successfully',
-          data: resource,
-          token: token,
-          refresh_token: refresh_token
-        }, status: :ok
-        return
-      end
+    user = User.find_by(email: sign_in_params[:email])
+
+    if user&.valid_password?(sign_in_params[:password])
+      token = JWT.encode({ user_id: user.id }, Rails.application.credentials.secret_key_base)
+      render json: {
+        token: token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      }, status: :ok
+    else
+      render json: { error: 'Неверный email или пароль' }, status: :unauthorized
     end
   end
   
@@ -78,6 +75,10 @@ class Users::SessionsController < Devise::SessionsController
   
 
   private
+
+  def sign_in_params
+    params.require(:user).permit(:email, :password)
+  end
 
   # Функция для генерации refresh token
   def generate_refresh_token(user)
