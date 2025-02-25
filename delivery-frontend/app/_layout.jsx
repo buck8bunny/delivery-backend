@@ -13,7 +13,7 @@ export default function RootLayout() {
             <Stack.Screen name="+not-found" />
             <Stack.Screen
               name="product/[id]"
-              options={{ title: "Product Details", headerShown: true }}
+              options={{ title: "Product Details", headerShown: false }}
             />
             <Stack.Screen
               name="checkout" // ✅ Добавляем CheckoutScreen

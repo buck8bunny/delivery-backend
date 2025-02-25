@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  SafeAreaView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -17,43 +18,46 @@ import { useUser } from "../context/UserContext";
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function ProfileScreen() {
-  const { updateUserName } = useUser();
-  const [userName, setUserName] = useState("");
-  const [email, setEmail] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [editing, setEditing] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
+  const { userName, updateUserName, email, updateEmail } = useUser();
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [tempUserName, setTempUserName] = useState(userName);
 
   useEffect(() => {
-    loadUserData();
+    const fetchUserData = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch(`${API_URL}/users/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          updateEmail(data.email);
+          if (data.name) {
+            updateUserName(data.name);
+            setTempUserName(data.name);
+            await AsyncStorage.setItem("userName", data.name);
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке данных пользователя:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
   }, []);
-
-  const loadUserData = async () => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        router.replace("/");
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/auth/validate`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json();
-      
-      if (result.valid && result.user) {
-        setUserName(result.user.name);
-        setEmail(result.user.email);
-      }
-    } catch (error) {
-      console.error("Ошибка при загрузке данных:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("token");
@@ -70,7 +74,7 @@ export default function ProfileScreen() {
 
       if (editing === "name") {
         endpoint = `${API_URL}/users/update_name`;
-        bodyData = { name: userName };
+        bodyData = { name: tempUserName };
       } else if (editing === "email" && newEmail) {
         if (!currentPassword) {
           setErrorMessage("Введите текущий пароль");
@@ -85,9 +89,6 @@ export default function ProfileScreen() {
         }
         endpoint = `${API_URL}/users/password/update`;
         bodyData = { current_password: currentPassword, new_password: newPassword };
-      } else {
-        setErrorMessage("Пожалуйста, заполните все поля");
-        return;
       }
 
       const response = await fetch(endpoint, {
@@ -100,13 +101,13 @@ export default function ProfileScreen() {
       });
 
       const result = await response.json();
-      
+
       if (response.ok) {
         if (editing === "name") {
-          updateUserName(userName);
-          await AsyncStorage.setItem("userName", userName);
+          updateUserName(tempUserName);
+          await AsyncStorage.setItem("userName", tempUserName);
         } else if (editing === "email") {
-          setEmail(newEmail);
+          updateEmail(newEmail);
         }
         setEditing(null);
         setCurrentPassword("");
@@ -169,8 +170,8 @@ export default function ProfileScreen() {
             {editing === "name" && (
               <EditableField
                 label="Новое имя"
-                value={userName}
-                onChange={setUserName}
+                value={tempUserName}
+                onChange={setTempUserName}
                 placeholder="Введите новое имя"
               />
             )}
