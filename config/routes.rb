@@ -20,18 +20,30 @@ Rails.application.routes.draw do
     # Изминение имени
     patch '/users/password/update', to: 'users/passwords#update'
 
+    post '/payment-sheet', to: 'payments#payment_sheet'
   end
 
-
+  # Перемещаем payment-sheet маршрут за пределы devise_scope
+  post '/payment-sheet', to: 'payments#payment_sheet'
 
   resources :products, only: [:index, :show, :create, :update, :destroy]
   resources :orders, only: [:index, :show, :create, :update, :destroy]
   resources :cart_items, only: [:index, :create, :update, :destroy]
 
   get 'cart_total', to: 'cart_items#cart_total'
+
+  # Обновляем маршрут для webhook, добавляя поддержку GET и POST
+  match '/stripe/webhook', to: 'payments#webhook', via: [:get, :post]
+  # или
+  get '/stripe/webhook', to: 'payments#webhook'
   post '/stripe/webhook', to: 'payments#webhook'
 
+  resources :orders, only: [:create] do
+    collection do
+      post :confirm_payment
+    end
+  end
 
-
+  post '/orders/:id/cancel', to: 'payments#cancel_order'
 
 end

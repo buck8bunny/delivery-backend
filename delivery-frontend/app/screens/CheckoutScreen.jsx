@@ -11,15 +11,17 @@ import {
 import { useStripe } from "@stripe/stripe-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+
 const STRIPE_PK = "pk_test_51Qu9QKKHwD7tNZiZSjDPbyg6qBXzTBa3AP2mJVsBpm3DT6jVLzVO1yuxFPBTfNjXYgzPK744b6h5Z9Gipu28XClh00fGcbfKLB";
 
 const CheckoutScreen = () => {
   console.log("🚀 Rendering CheckoutScreen");
   
-  const { createPaymentMethod, handleCardAction, confirmPayment } = useStripe();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const [amount, setAmount] = useState(0);
   const [stripeReady, setStripeReady] = useState(false);
   
@@ -30,6 +32,8 @@ const CheckoutScreen = () => {
 
   // Добавим состояние для хранения товаров
   const [cartItems, setCartItems] = useState([]);
+
+  const [orderId, setOrderId] = useState(null);
 
   useEffect(() => {
     console.log("🔄 Component mounted");
@@ -73,25 +77,45 @@ const CheckoutScreen = () => {
     }
   };
 
-  // Валидация полей карты
-  const isCardNumberValid = () => cardNumber.replace(/\s/g, '').length === 16;
-  const isExpiryValid = () => {
+  // Добавим функцию проверки валидности карты
+  const isCardNumberValid = (number) => {
+    const cleaned = number.replace(/\s/g, '');
+    return cleaned.length === 16 && /^\d+$/.test(cleaned);
+  };
+
+  const isExpiryValid = (expiry) => {
+    if (!expiry.includes('/')) return false;
     const [month, year] = expiry.split('/');
-    if (!month || !year) return false;
+    const currentYear = new Date().getFullYear() % 100;
+    const currentMonth = new Date().getMonth() + 1;
     
     const monthNum = parseInt(month);
     const yearNum = parseInt(year);
-    const currentYear = new Date().getFullYear() % 100;
-    const currentMonth = new Date().getMonth() + 1;
-
-    if (monthNum < 1 || monthNum > 12) return false;
-    if (yearNum < currentYear) return false;
-    if (yearNum === currentYear && monthNum < currentMonth) return false;
     
-    return true;
+    return monthNum >= 1 && 
+           monthNum <= 12 && 
+           yearNum >= currentYear && 
+           (yearNum > currentYear || monthNum >= currentMonth);
   };
-  const isCvcValid = () => cvc.length === 3;
-  const isFormValid = () => isCardNumberValid() && isExpiryValid() && isCvcValid();
+
+  const isCvcValid = (cvc) => {
+    return /^\d{3}$/.test(cvc);
+  };
+
+  const isFormValid = () => {
+    const isValid = isCardNumberValid(cardNumber) && 
+                   isExpiryValid(expiry) && 
+                   isCvcValid(cvc);
+    
+    console.log("Form validation:", {
+      cardNumberValid: isCardNumberValid(cardNumber),
+      expiryValid: isExpiryValid(expiry),
+      cvcValid: isCvcValid(cvc),
+      overall: isValid
+    });
+    
+    return isValid;
+  };
 
   const fetchCartTotal = async () => {
     try {
@@ -99,8 +123,7 @@ const CheckoutScreen = () => {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         Alert.alert("Ошибка", "Вы не авторизованы");
-        router.replace("/login");
-        return;
+        router.replace("/login");        return;
       }
 
       const response = await fetch(`${API_URL}/cart_total`, {
@@ -141,198 +164,147 @@ const CheckoutScreen = () => {
     }
   };
 
-  const handlePayPress = async () => {
-    if (!isFormValid()) {
-      Alert.alert("Ошибка", "Пожалуйста, проверьте данные карты");
-      return;
-    }
-
+  const fetchPaymentSheetParams = async () => {
     try {
-      setLoading(true);
-      console.log("💳 Creating order...");
-
       const token = await AsyncStorage.getItem("token");
       if (!token) throw new Error("Не авторизован");
 
-      // Формируем данные заказа с ценой для каждого товара
-      const orderData = {
-        order: {
-          total: amount,
-          order_items_attributes: cartItems.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            price: item.product.price // Добавляем цену из продукта
-          }))
+      console.log("📡 Fetching payment sheet params...");
+      const response = await fetch(`${API_URL}/payment-sheet`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         }
-      };
-
-      console.log("📦 Order data:", JSON.stringify(orderData, null, 2));
-
-      // 1. Создаем заказ
-      const orderResponse = await fetch(`${API_URL}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(orderData)
       });
 
-      const orderResult = await orderResponse.json();
-      if (!orderResponse.ok) {
-        console.error("❌ Order creation failed:", orderResult);
-        throw new Error(orderResult.errors?.join(', ') || 'Ошибка создания заказа');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Network response was not ok');
       }
 
-      console.log("✅ Order created:", orderResult);
-
-      // 2. Создаем платежный метод
-      console.log("💳 Creating payment method...");
-      const { paymentMethod, error: pmError } = await createPaymentMethod({
-        paymentMethodType: 'Card',
-        billingDetails: {
-          email: 'example@example.com',
-        },
-        card: {
-          number: cardNumber.replace(/\s/g, ''),
-          exp_month: parseInt(expiry.split('/')[0]),
-          exp_year: parseInt('20' + expiry.split('/')[1]),
-          cvc: cvc,
-        },
-      });
-
-      if (pmError) {
-        console.error("❌ Payment method error:", pmError);
-        throw new Error(pmError.message);
+      const data = await response.json();
+      console.log("✅ Payment sheet params received");
+      
+      // Сохраняем ID заказа
+      if (data.orderId) {
+        setOrderId(data.orderId);
       }
-
-      console.log("✅ Payment method created:", paymentMethod.id);
-
-      // 3. Подтверждаем платеж
-      console.log("💳 Confirming payment...");
-      const { error: confirmError } = await confirmPayment(orderResult.client_secret, {
-        paymentMethodType: 'Card',
-        paymentMethod: paymentMethod.id,
-      });
-
-      if (confirmError) {
-        console.error("❌ Confirm payment error:", confirmError);
-        throw new Error(confirmError.message);
-      }
-
-      console.log("✅ Payment confirmed");
-
-      // 4. Подтверждаем оплату на бэкенде
-      const confirmResponse = await fetch(`${API_URL}/confirm_payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          order_id: orderResult.order.id,
-          payment_intent_id: orderResult.order.payment_intent_id
-        })
-      });
-
-      const confirmData = await confirmResponse.json();
-      if (!confirmResponse.ok) {
-        throw new Error(confirmData.message || 'Ошибка подтверждения оплаты');
-      }
-
-      console.log("✅ Payment completed successfully");
-      Alert.alert("Успех", "Заказ успешно оплачен!");
-      router.push("/success");
-
+      
+      return data;
     } catch (error) {
-      console.error("❌ Payment error:", error);
+      console.error("❌ Error fetching payment sheet params:", error);
+      throw error;
+    }
+  };
+
+  const handlePaymentCancel = async () => {
+    if (!orderId) return;
+
+    try {
+      const token = await AsyncStorage.getItem("token");
+      await fetch(`${API_URL}/orders/${orderId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        }
+      });
+    } catch (error) {
+      console.error("Error canceling order:", error);
+    }
+  };
+
+  const initializePaymentSheet = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchPaymentSheetParams();
+
+      console.log("🔄 Initializing payment sheet...");
+      const { error } = await initPaymentSheet({
+        merchantDisplayName: "Your Store Name",
+        customerId: data.customer,
+        customerEphemeralKeySecret: data.ephemeralKey,
+        paymentIntentClientSecret: data.paymentIntent,
+        // Удалим лишние параметры
+        defaultBillingDetails: {}
+      });
+
+      if (error) {
+        console.error("❌ Error initializing payment sheet:", error);
+        Alert.alert("Ошибка", error.message);
+      } else {
+        console.log("✅ Payment sheet initialized");
+        setReady(true);
+      }
+    } catch (error) {
+      console.error("❌ Error in initializePaymentSheet:", error);
       Alert.alert("Ошибка", error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!stripeReady) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Инициализация платежной системы...</Text>
-      </View>
-    );
-  }
+  const openPaymentSheet = async () => {
+    if (!ready) {
+      Alert.alert("Подождите", "Форма оплаты еще загружается");
+      return;
+    }
+
+    try {
+      const { error } = await presentPaymentSheet();
+
+      if (error) {
+        console.log(`❌ Payment sheet error:`, error);
+        
+        if (error.code === 'Canceled') {
+          // Обрабатываем отмену платежа
+          await handlePaymentCancel();
+          router.replace("/orders");
+          return;
+        }
+        
+        Alert.alert(`Ошибка оплаты`, error.message);
+      } else {
+        console.log("✅ Payment successful!");
+        Alert.alert(
+          'Успех!', 
+          'Ваш заказ успешно оплачен',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace("/orders")
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error in openPaymentSheet:", error);
+      Alert.alert("Ошибка", error.message);
+    }
+  };
+
+  useEffect(() => {
+    initializePaymentSheet();
+  }, []);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Оплата</Text>
       <Text style={styles.amount}>Сумма: {amount} $</Text>
 
-      <View style={styles.cardContainer}>
-        <Text style={styles.label}>Номер карты</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="4242 4242 4242 4242"
-          value={cardNumber}
-          onChangeText={handleCardNumberChange}
-          keyboardType="numeric"
-          maxLength={19} // 16 цифр + 3 пробела
-        />
-        <Text style={styles.validationText}>
-          {cardNumber ? (isCardNumberValid() ? "✅" : "❌") : ""}
-        </Text>
-
-        <View style={styles.row}>
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>Срок действия</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="MM/YY"
-              value={expiry}
-              onChangeText={handleExpiryChange}
-              keyboardType="numeric"
-              maxLength={5} // MM/YY
-            />
-            <Text style={styles.validationText}>
-              {expiry ? (isExpiryValid() ? "✅" : "❌") : ""}
-            </Text>
-          </View>
-
-          <View style={styles.halfWidth}>
-            <Text style={styles.label}>CVC</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="123"
-              value={cvc}
-              onChangeText={handleCvcChange}
-              keyboardType="numeric"
-              maxLength={3}
-              secureTextEntry
-            />
-            <Text style={styles.validationText}>
-              {cvc ? (isCvcValid() ? "✅" : "❌") : ""}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.infoContainer}>
-        <Text style={styles.infoText}>
-          Тестовая карта:{'\n'}
-          4242 4242 4242 4242{'\n'}
-          Любая будущая дата (MM/YY){'\n'}
-          Любые 3 цифры
-        </Text>
-      </View>
-
       <TouchableOpacity
-        style={[styles.payButton, !isFormValid() && styles.payButtonDisabled]}
-        onPress={handlePayPress}
-        disabled={!isFormValid() || loading}
+        style={[styles.payButton, (!ready || loading) && styles.payButtonDisabled]}
+        onPress={openPaymentSheet}
+        disabled={!ready || loading}
       >
         {loading ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.payButtonText}>
-            {isFormValid() ? "Оплатить" : "Введите данные карты"}
+            {ready ? "Оплатить" : "Подготовка формы оплаты..."}
           </Text>
         )}
       </TouchableOpacity>
@@ -349,99 +321,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginVertical: 20,
+    marginBottom: 20,
   },
   amount: {
-    fontSize: 20,
-    textAlign: 'center',
+    fontSize: 18,
     marginBottom: 30,
-  },
-  cardContainer: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 5,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
-  },
-  halfWidth: {
-    width: '48%',
-  },
-  validationText: {
-    fontSize: 16,
-    marginLeft: 5,
-    marginTop: 2,
-  },
-  infoContainer: {
-    backgroundColor: '#e8e8e8',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
   },
   payButton: {
     backgroundColor: '#007AFF',
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
   },
   payButtonDisabled: {
-    backgroundColor: '#A0A0A0',
+    backgroundColor: '#ccc',
   },
   payButtonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  debugText: {
-    marginTop: 20,
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  statusContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#333',
-    marginVertical: 2,
   },
 });
 
 export default CheckoutScreen;
+
