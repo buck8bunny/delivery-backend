@@ -149,9 +149,26 @@ class PaymentsController < ApplicationController
         
         if order
           Rails.logger.info "Found order: #{order.id}"
-          order.update!(status: 'completed')
-          order.user.cart_items.destroy_all
-          Rails.logger.info "Order updated and cart cleared"
+          
+          # Обновляем stock в транзакции
+          ActiveRecord::Base.transaction do
+            order.order_items.each do |item|
+              product = item.product
+              new_stock = product.stock - item.quantity
+              
+              if new_stock >= 0
+                Rails.logger.info "Updating stock for product #{product.id} from #{product.stock} to #{new_stock}"
+                product.update!(stock: new_stock)
+              else
+                Rails.logger.error "Not enough stock for product #{product.id}"
+                raise ActiveRecord::Rollback
+              end
+            end
+            
+            order.update!(status: 'completed')
+            order.user.cart_items.destroy_all
+            Rails.logger.info "Order updated and cart cleared"
+          end
         else
           Rails.logger.error "Order not found for payment_intent_id: #{payment_intent.id}"
         end
@@ -161,6 +178,11 @@ class PaymentsController < ApplicationController
         order = Order.find_by(payment_intent_id: payment_intent.id)
         order&.update!(status: 'failed')
         Rails.logger.info "Payment failed for order: #{order&.id}"
+
+      when 'payment_intent.canceled'
+        payment_intent = event.data.object
+        order = Order.find_by(payment_intent_id: payment_intent.id)
+        order&.update!(status: 'cancelled') if order&.pending?
       end
 
       render json: { status: 'success' }

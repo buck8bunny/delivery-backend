@@ -50,4 +50,10 @@ Rails.application.routes.draw do
 
   post '/orders/:id/cancel', to: 'payments#cancel_order'
 
+  resources :orders do
+    member do
+      post :cancel
+    end
+  end
+
 end
