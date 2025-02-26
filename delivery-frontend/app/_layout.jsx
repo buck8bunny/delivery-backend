@@ -2,10 +2,11 @@ import React, { Component } from 'react';
 import { SafeAreaView } from 'react-native';
 import { Stack } from "expo-router";
 import UserProvider from './context/UserContext';
-
+import { CartProvider } from './context/CartContext';
 export default function RootLayout() {
   return (
-      <UserProvider>
+    <UserProvider>
+      <CartProvider>
         <SafeAreaView style={{ flex: 1 }}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -21,6 +22,7 @@ export default function RootLayout() {
             />
           </Stack>
         </SafeAreaView>
-      </UserProvider>
+      </CartProvider>
+    </UserProvider>
   );
 }

@@ -109,7 +109,10 @@ const ProductDetailScreen = () => {
       </ScrollView>
 
       <View style={styles.bottomContainer}>
-        <AddToCartButton productId={product.id} />
+        <AddToCartButton 
+          productId={product.id}
+          stock={product.stock}
+        />
       </View>
     </SafeAreaView>
   );

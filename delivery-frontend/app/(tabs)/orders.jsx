@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback  } from "react";
 import { 
   View, 
   Text, 
@@ -6,11 +6,14 @@ import {
   FlatList, 
   ActivityIndicator, 
   TouchableOpacity,
-  RefreshControl 
+  RefreshControl,
+  Alert,
+  Image 
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -18,6 +21,10 @@ const OrdersScreen = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -60,16 +67,55 @@ const OrdersScreen = () => {
     fetchOrders();
   }, []);
 
+  const handleCancelOrder = async (orderId) => {
+    Alert.alert(
+      "Cancel Order",
+      "Are you sure you want to cancel this order?",
+      [
+        {
+          text: "No",
+          style: "cancel"
+        },
+        {
+          text: "Yes",
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              const response = await fetch(`${API_URL}/orders/${orderId}/cancel`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (response.ok) {
+                // Обновляем список заказов
+                fetchOrders();
+                Alert.alert("Success", "Order cancelled successfully");
+              } else {
+                const error = await response.json();
+                Alert.alert("Error", error.error || "Failed to cancel order");
+              }
+            } catch (error) {
+              console.error("Error cancelling order:", error);
+              Alert.alert("Error", "Failed to cancel order");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
-        return '#4CAF50'; // Зеленый
-      case 'pending':
-        return '#FFC107'; // Желтый
+        return '#34C759';
       case 'failed':
-        return '#F44336'; // Красный
+        return '#FF3B30';
+      case 'pending':
+        return '#FFC107';
       default:
-        return '#9E9E9E'; // Серый
+        return '#007AFF';
     }
   };
 
@@ -81,6 +127,7 @@ const OrdersScreen = () => {
         return 'В обработке';
       case 'failed':
         return 'Отменён';
+
       default:
         return 'Неизвестно';
     }
@@ -90,12 +137,9 @@ const OrdersScreen = () => {
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
         <Text style={styles.orderNumber}>Заказ #{item.id}</Text>
-        <Text style={[
-          styles.orderStatus, 
-          { color: getStatusColor(item.status) }
-        ]}>
-          {getStatusText(item.status)}
-        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        </View>
       </View>
 
       <View style={styles.orderDetails}>
@@ -113,10 +157,30 @@ const OrdersScreen = () => {
 
       <View style={styles.orderItems}>
         {item.order_items?.map((orderItem, index) => (
-          <Text key={index} style={styles.orderItem}>
-            {`${orderItem.product?.name || 'Неизвестный товар'} x ${orderItem.quantity} ($${orderItem.price})`}
-          </Text>
+          <View key={index} style={styles.orderItem}>
+            <Image
+              source={{ uri: orderItem.product?.image_url }}
+              style={styles.productImage}
+              contentFit="cover"
+            />
+            <View style={styles.productInfo}>
+              <Text style={styles.productName}>{orderItem.product?.name || 'Неизвестный товар'}</Text>
+              <Text style={styles.quantity}>Количество: {orderItem.quantity}</Text>
+              <Text style={styles.price}>${orderItem.price}</Text>
+            </View>
+          </View>
         ))}
+      </View>
+
+      <View style={styles.orderFooter}>
+        {item.status === 'pending' && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => handleCancelOrder(item.id)}
+          >
+            <Text style={styles.cancelButtonText}>Отменить заказ</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -205,8 +269,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold'
   },
-  orderStatus: {
-    fontSize: 16,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#007AFF',
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '500'
   },
   orderDetails: {
@@ -227,9 +298,30 @@ const styles = StyleSheet.create({
     paddingTop: 12
   },
   orderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  productImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 6,
+    marginRight: 12
+  },
+  productInfo: {
+    flex: 1
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  quantity: {
     fontSize: 14,
-    color: '#444',
-    marginBottom: 4
+    color: '#666'
+  },
+  price: {
+    fontSize: 14,
+    fontWeight: '500'
   },
   emptyText: {
     fontSize: 18,
@@ -247,7 +339,28 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '500'
-  }
+  },
+  orderFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  cancelButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 'auto',
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default OrdersScreen;

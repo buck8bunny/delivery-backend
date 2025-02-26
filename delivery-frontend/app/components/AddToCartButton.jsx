@@ -6,43 +6,19 @@ import {
   ActivityIndicator, 
   View,
   Animated,
-  Platform 
+  Platform
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useCart } from '../context/CartContext';
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const AddToCartButton = ({ productId, mini = false }) => {
+const AddToCartButton = ({ productId, mini = false, stock = 0 }) => {
   const [loading, setLoading] = useState(false);
-  const [added, setAdded] = useState(false);
   const [animation] = useState(new Animated.Value(1));
-
-  useEffect(() => {
-    const checkCart = async () => {
-      try {
-        const token = await AsyncStorage.getItem("token");
-        if (!token) return;
-
-        const response = await fetch(`${API_URL}/cart_items`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (response.ok && Array.isArray(data)) {
-          const itemInCart = data.some((item) => item.product_id === productId);
-          if (itemInCart) setAdded(true);
-        }
-      } catch (error) {
-        console.error("Ошибка при проверке корзины:", error);
-      }
-    };
-
-    checkCart();
-  }, [productId]);
+  const { isInCart, getCartItemId, addToCart, removeFromCart, fetchCartItems } = useCart();
+  const isOutOfStock = stock <= 0;
 
   const animateButton = () => {
     Animated.sequence([
@@ -60,38 +36,56 @@ const AddToCartButton = ({ productId, mini = false }) => {
   };
 
   const handleAddToCart = async () => {
-    if (added) return;
-
     try {
       setLoading(true);
       animateButton();
       
       const token = await AsyncStorage.getItem("token");
-
       if (!token) {
-        alert("Вы не авторизованы. Пожалуйста, войдите в систему.");
+        alert("Please log in to continue");
         return;
       }
 
-      const response = await fetch(`${API_URL}/cart_items`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ product_id: productId, quantity: 1 }),
-      });
+      const cartItemId = getCartItemId(productId);
+      
+      if (isInCart(productId)) {
+        // Remove from cart
+        const response = await fetch(`${API_URL}/cart_items/${cartItemId}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setAdded(true);
+        if (response.ok) {
+          removeFromCart(cartItemId);
+          await fetchCartItems();
+        } else {
+          alert("Failed to remove item from cart");
+        }
       } else {
-        alert(data.message || "Не удалось добавить товар в корзину.");
+        // Add to cart
+        const response = await fetch(`${API_URL}/cart_items`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ product_id: productId, quantity: 1 }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          addToCart(data);
+          await fetchCartItems();
+        } else {
+          alert(data.message || "Failed to add item to cart");
+        }
       }
     } catch (error) {
-      console.error("Ошибка при добавлении товара в корзину:", error);
-      alert("Произошла ошибка при добавлении товара в корзину.");
+      console.error("Error managing cart:", error);
+      alert("An error occurred while managing the cart");
     } finally {
       setLoading(false);
     }
@@ -101,15 +95,21 @@ const AddToCartButton = ({ productId, mini = false }) => {
     return (
       <Animated.View style={{ transform: [{ scale: animation }] }}>
         <TouchableOpacity
-          style={[styles.miniButton, added && styles.buttonAdded]}
+          style={[
+            styles.miniButton, 
+            isInCart(productId) && styles.buttonAdded,
+            isOutOfStock && styles.buttonDisabled
+          ]}
           onPress={handleAddToCart}
-          disabled={loading || added}
+          disabled={loading || isOutOfStock}
           activeOpacity={0.8}
         >
           {loading ? (
             <ActivityIndicator size="small" color="white" />
-          ) : added ? (
-            <Icon name="check" size={20} color="white" />
+          ) : isOutOfStock ? (
+            <Icon name="remove-shopping-cart" size={20} color="white" />
+          ) : isInCart(productId) ? (
+            <Icon name="remove-shopping-cart" size={20} color="white" />
           ) : (
             <Icon name="add-shopping-cart" size={20} color="white" />
           )}
@@ -121,26 +121,35 @@ const AddToCartButton = ({ productId, mini = false }) => {
   return (
     <Animated.View style={{ transform: [{ scale: animation }] }}>
       <TouchableOpacity
-        style={[styles.button, added && styles.buttonAdded]}
+        style={[
+          styles.button, 
+          isInCart(productId) && styles.buttonAdded,
+          isOutOfStock && styles.buttonDisabled
+        ]}
         onPress={handleAddToCart}
-        disabled={loading || added}
+        disabled={loading || isOutOfStock}
         activeOpacity={0.8}
       >
         <View style={styles.buttonContent}>
           {loading ? (
             <>
               <ActivityIndicator size="small" color="white" style={styles.icon} />
-              <Text style={styles.text}>Добавление...</Text>
+              <Text style={styles.text}>Processing...</Text>
             </>
-          ) : added ? (
+          ) : isOutOfStock ? (
             <>
-              <Icon name="check" size={24} color="white" style={styles.icon} />
-              <Text style={styles.text}>В корзине</Text>
+              <Icon name="remove-shopping-cart" size={24} color="white" style={styles.icon} />
+              <Text style={styles.text}>Out of Stock</Text>
+            </>
+          ) : isInCart(productId) ? (
+            <>
+              <Icon name="remove-shopping-cart" size={24} color="white" style={styles.icon} />
+              <Text style={styles.text}>Remove from Cart</Text>
             </>
           ) : (
             <>
               <Icon name="shopping-cart" size={24} color="white" style={styles.icon} />
-              <Text style={styles.text}>Добавить в корзину</Text>
+              <Text style={styles.text}>Add to Cart</Text>
             </>
           )}
         </View>
@@ -209,6 +218,9 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
+  },
+  buttonDisabled: {
+    backgroundColor: '#D1D1D6',
   },
 });
 

@@ -91,7 +91,7 @@ const HomeScreen = () => {
         <View style={styles.priceContainer}>
           <Text style={styles.productPrice}>${item.price}</Text>
           <View style={styles.addButtonContainer}>
-            <AddToCartButton productId={item.id} mini />
+            <AddToCartButton productId={item.id} mini stock={item.stock} />
           </View>
         </View>
       </View>

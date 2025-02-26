@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F7",
   },
   header: {
-    paddingTop: 60,
-    paddingBottom: 30,
+    paddingTop: 20,
+    paddingBottom: 20,
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderBottomLeftRadius: 24,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFE5E5",
     padding: 16,
     borderRadius: 16,
-    marginTop: 24,
+    marginTop:12,
   },
   logoutText: {
     color: "#FF3B30",

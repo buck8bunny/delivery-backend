@@ -12,6 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import AddToCartButton from "../components/AddToCartButton";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -54,26 +55,27 @@ const SearchScreen = () => {
   };
 
   const renderProduct = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.productCard}
       onPress={() => handlePress(item.id)}
       activeOpacity={0.7}
     >
-      <Image 
-        source={{ uri: item.image_url }} 
+      <Image
+        source={{ uri: item.image_url }}
         style={styles.productImage}
-        defaultSource={require("../../assets/placeholder.png")}
+        contentFit="cover"
+        transition={200}
       />
       <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.productDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <Text style={styles.productPrice}>
-          ${item.price}
-        </Text>
+        <Text style={styles.productName}>{item.name}</Text>
+        <View style={styles.bottomContainer}>
+          <Text style={styles.productPrice}>${item.price}</Text>
+          <AddToCartButton 
+            productId={item.id} 
+            mini={true} 
+            stock={item.stock}
+          />
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -205,23 +207,24 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
-    padding: 16,
+    padding: 10,
     justifyContent: "space-between",
   },
   productName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "600",
     marginBottom: 4,
   },
-  productDescription: {
-    fontSize: 15,
-    color: "#666",
-    marginBottom: 8,
+  bottomContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
   },
   productPrice: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 14,
     color: "#007AFF",
+    fontWeight: "500",
   },
   emptyContainer: {
     flex: 1,

@@ -57,11 +57,8 @@ const CartScreen = () => {
     }
   };
 
-  const updateQuantity = async (cartItemId, newQuantity) => {
-    if (newQuantity < 1) {
-      deleteCartItem(cartItemId);
-      return;
-    }
+  const updateQuantity = async (cartItemId, newQuantity, stock) => {
+    if (newQuantity <= 0 || newQuantity > stock) return;
 
     try {
       const token = await AsyncStorage.getItem("token");
@@ -115,57 +112,73 @@ const CartScreen = () => {
     return cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toFixed(2);
   }, [cartItems]);
 
-  const renderCartItem = ({ item }) => (
-    <Animated.View
-      style={[
-        styles.cartItem,
-        {
-          opacity: deleteAnimation,
-          transform: [
-            {
-              scale: deleteAnimation,
-            },
-          ],
-        },
-      ]}
-    >
-      <Image
-        source={{ uri: item.product.image_url }}
-        style={styles.productImage}
-        defaultSource={require("../../assets/placeholder.png")}
-      />
-      
-      <View style={styles.productInfo}>
-        <Text style={styles.productName}>{item.product.name}</Text>
-        <Text style={styles.productPrice}>${item.product.price}</Text>
-        
-        <View style={styles.quantityContainer}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity - 1)}
-          >
-            <Ionicons name="remove" size={20} color="#007AFF" />
-          </TouchableOpacity>
+  const renderCartItem = ({ item }) => {
+    const isMaxQuantity = item.quantity >= item.product.stock;
 
-          <Text style={styles.quantity}>{item.quantity}</Text>
+    return (
+      <Animated.View
+        style={[
+          styles.cartItem,
+          {
+            opacity: deleteAnimation,
+            transform: [
+              {
+                scale: deleteAnimation,
+              },
+            ],
+          },
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.productContainer}
+          onPress={() => router.push(`/product/${item.product.id}`)}
+          activeOpacity={0.7}
+        >
+          <Image
+            source={{ uri: item.product.image_url }}
+            style={styles.productImage}
+            defaultSource={require("../../assets/placeholder.png")}
+          />
+          
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{item.product.name}</Text>
+            <Text style={styles.productPrice}>${item.product.price}</Text>
+            
+            <View style={styles.quantityContainer}>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => updateQuantity(item.id, item.quantity - 1, item.product.stock)}
+                disabled={item.quantity <= 1}
+              >
+                <Ionicons name="remove" size={20} color={item.quantity <= 1 ? "#8E8E93" : "#007AFF"} />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateQuantity(item.id, item.quantity + 1)}
-          >
-            <Ionicons name="add" size={20} color="#007AFF" />
-          </TouchableOpacity>
+              <Text style={styles.quantity}>{item.quantity}</Text>
 
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => deleteCartItem(item.id)}
-          >
-            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Animated.View>
-  );
+              <TouchableOpacity
+                style={[styles.quantityButton, isMaxQuantity && styles.quantityButtonDisabled]}
+                onPress={() => updateQuantity(item.id, item.quantity + 1, item.product.stock)}
+                disabled={isMaxQuantity}
+              >
+                <Ionicons name="add" size={20} color={isMaxQuantity ? "#8E8E93" : "#007AFF"} />
+              </TouchableOpacity>
+
+              {isMaxQuantity && (
+                <Text style={styles.outOfStockText}>Out of stock</Text>
+              )}
+
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => deleteCartItem(item.id)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   if (loading) {
     return (
@@ -371,6 +384,19 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 17,
     fontWeight: "600",
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#E5E5EA',
+  },
+  outOfStockText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginLeft: 8,
+    marginRight: 'auto',
+  },
+  productContainer: {
+    flex: 1,
+    flexDirection: 'row',
   },
 });
 
