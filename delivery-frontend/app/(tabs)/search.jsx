@@ -7,7 +7,9 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   Image,
-  ActivityIndicator 
+  ActivityIndicator,
+  Modal,
+  ScrollView
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +24,9 @@ const SearchScreen = () => {
   const [searchText, setSearchText] = useState("");
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [sortBy, setSortBy] = useState('default');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   useEffect(() => {
     fetchProducts();
@@ -42,12 +47,65 @@ const SearchScreen = () => {
 
   const handleSearch = (text) => {
     setSearchText(text);
-    const filtered = products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(text.toLowerCase()) ||
-        product.description.toLowerCase().includes(text.toLowerCase())
-    );
+    applyFilters(text, sortBy, selectedCategory);
+  };
+
+  const applyFilters = (search = searchText, sort = sortBy, category = selectedCategory) => {
+    let filtered = [...products];
+
+    // Поиск по тексту
+    if (search) {
+      filtered = filtered.filter(
+        (product) =>
+          product.name.toLowerCase().includes(search.toLowerCase()) ||
+          product.description.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    // Фильтрация по категории
+    if (category !== 'all') {
+      filtered = filtered.filter(product => product.category === category);
+    }
+
+    // Сортировка
+    switch (sort) {
+      case 'priceAsc':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'priceDesc':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'nameAsc':
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'nameDesc':
+        filtered.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      default:
+        break;
+    }
+
     setFilteredProducts(filtered);
+  };
+
+  const handleFilterPress = () => {
+    setShowFilterModal(true);
+  };
+
+  const handleSortChange = (sort) => {
+    setSortBy(sort);
+    applyFilters(searchText, sort, selectedCategory);
+    setShowFilterModal(false);
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    applyFilters(searchText, sortBy, category);
+    setShowFilterModal(false);
+  };
+
+  const getCategories = () => {
+    return ['all', ...new Set(products.map(product => product.category))];
   };
 
   const handlePress = (id) => {
@@ -80,6 +138,98 @@ const SearchScreen = () => {
     </TouchableOpacity>
   );
 
+  const renderFilterModal = () => (
+    <Modal
+      visible={showFilterModal}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowFilterModal(false)}
+    >
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowFilterModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalContent}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Фильтры</Text>
+            <TouchableOpacity 
+              onPress={() => setShowFilterModal(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            <Text style={styles.filterSectionTitle}>Сортировка</Text>
+            <View style={styles.filterOptions}>
+              <TouchableOpacity 
+                style={[styles.filterOption, sortBy === 'default' && styles.filterOptionActive]}
+                onPress={() => handleSortChange('default')}
+              >
+                <Text style={[styles.filterOptionText, sortBy === 'default' && styles.filterOptionTextActive]}>
+                  По умолчанию
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.filterOption, sortBy === 'priceAsc' && styles.filterOptionActive]}
+                onPress={() => handleSortChange('priceAsc')}
+              >
+                <Text style={[styles.filterOptionText, sortBy === 'priceAsc' && styles.filterOptionTextActive]}>
+                  Цена (по возрастанию)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.filterOption, sortBy === 'priceDesc' && styles.filterOptionActive]}
+                onPress={() => handleSortChange('priceDesc')}
+              >
+                <Text style={[styles.filterOptionText, sortBy === 'priceDesc' && styles.filterOptionTextActive]}>
+                  Цена (по убыванию)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.filterOption, sortBy === 'nameAsc' && styles.filterOptionActive]}
+                onPress={() => handleSortChange('nameAsc')}
+              >
+                <Text style={[styles.filterOptionText, sortBy === 'nameAsc' && styles.filterOptionTextActive]}>
+                  Название (А-Я)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.filterOption, sortBy === 'nameDesc' && styles.filterOptionActive]}
+                onPress={() => handleSortChange('nameDesc')}
+              >
+                <Text style={[styles.filterOptionText, sortBy === 'nameDesc' && styles.filterOptionTextActive]}>
+                  Название (Я-А)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.filterSectionTitle}>Категории</Text>
+            <View style={styles.filterOptions}>
+              {getCategories().map((category) => (
+                <TouchableOpacity 
+                  key={category}
+                  style={[styles.filterOption, selectedCategory === category && styles.filterOptionActive]}
+                  onPress={() => handleCategoryChange(category)}
+                >
+                  <Text style={[styles.filterOptionText, selectedCategory === category && styles.filterOptionTextActive]}>
+                    {category === 'all' ? 'Все категории' : category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -109,7 +259,15 @@ const SearchScreen = () => {
             <Ionicons name="close-circle" size={20} color="#666" />
           </TouchableOpacity>
         )}
+        <TouchableOpacity 
+          onPress={handleFilterPress}
+          style={styles.filterButton}
+        >
+          <Ionicons name="filter" size={20} color="#666" />
+        </TouchableOpacity>
       </View>
+
+      {renderFilterModal()}
 
       {filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -243,6 +401,75 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#999",
     textAlign: "center",
+  },
+  filterButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    height: '90%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalBody: {
+    flex: 1,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#666',
+  },
+  filterOptions: {
+    marginBottom: 24,
+  },
+  filterOption: {
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#F2F2F7',
+  },
+  filterOptionActive: {
+    backgroundColor: '#007AFF',
+  },
+  filterOptionText: {
+    fontSize: 16,
+    color: '#000',
+  },
+  filterOptionTextActive: {
+    color: '#FFF',
   },
 });
 
