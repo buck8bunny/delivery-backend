@@ -20,4 +20,14 @@ end
   has_many :orders, dependent: :destroy
   has_many :cart_items, dependent: :destroy
   has_many :products, through: :cart_items
+
+  validates :role, presence: true, inclusion: { in: %w[user admin] }
+  
+  def admin?
+    role == 'admin'
+  end
+
+  def user?
+    role == 'user'
+  end
 end

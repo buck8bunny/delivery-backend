@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -11,54 +11,23 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { useCart } from '../context/CartContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const CartScreen = () => {
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [deleteAnimation] = useState(new Animated.Value(1));
   const navigation = useNavigation();
-
-  const fetchCartItems = async () => {
-    try {
-      setLoading(true);
-      const token = await AsyncStorage.getItem("token");
-
-      if (!token) {
-        alert("Вы не авторизованы. Пожалуйста, войдите в систему.");
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/cart_items`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setCartItems(data);
-      } else {
-        alert(data.message || "Не удалось загрузить корзину.");
-      }
-    } catch (error) {
-      console.error("Ошибка при загрузке корзины:", error);
-      alert("Произошла ошибка при загрузке корзины.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { cartItems, fetchCartItems } = useCart();
 
   const updateQuantity = async (cartItemId, newQuantity, stock) => {
     if (newQuantity <= 0 || newQuantity > stock) return;
+    setLoading(true);
 
     try {
       const token = await AsyncStorage.getItem("token");
@@ -72,16 +41,19 @@ const CartScreen = () => {
       });
 
       if (response.ok) {
-        fetchCartItems();
+        await fetchCartItems(); // Обновляем корзину через контекст
       } else {
         alert("Не удалось обновить количество товара.");
       }
     } catch (error) {
       console.error("Ошибка при обновлении количества:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const deleteCartItem = async (cartItemId) => {
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem("token");
       const response = await fetch(`${API_URL}/cart_items/${cartItemId}`, {
@@ -92,27 +64,31 @@ const CartScreen = () => {
       });
 
       if (response.ok) {
-        fetchCartItems();
+        await fetchCartItems(); // Обновляем корзину через контекст
       } else {
         alert("Не удалось удалить товар.");
       }
     } catch (error) {
       console.error("Ошибка при удалении товара:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchCartItems();
-    }, [])
-  );
-
-  // Подсчет общей суммы корзины
-  const totalAmount = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toFixed(2);
-  }, [cartItems]);
+  // Подсчет общей суммы корзины с проверкой на наличие product
+  const totalAmount = cartItems
+    .reduce(
+      (sum, item) => sum + item.product.price * item.quantity,
+      0
+    )
+    .toFixed(2);
 
   const renderCartItem = ({ item }) => {
+    if (!item || !item.product) {
+      console.warn('Invalid cart item:', item);
+      return null;
+    }
+
     const isMaxQuantity = item.quantity >= item.product.stock;
 
     return (
@@ -121,11 +97,7 @@ const CartScreen = () => {
           styles.cartItem,
           {
             opacity: deleteAnimation,
-            transform: [
-              {
-                scale: deleteAnimation,
-              },
-            ],
+            transform: [{ scale: deleteAnimation }],
           },
         ]}
       >
@@ -141,8 +113,8 @@ const CartScreen = () => {
           />
           
           <View style={styles.productInfo}>
-            <Text style={styles.productName}>{item.product.name}</Text>
-            <Text style={styles.productPrice}>${item.product.price}</Text>
+            <Text style={styles.productName}>{item.product.name || 'Unnamed Product'}</Text>
+            <Text style={styles.productPrice}>${item.product.price || 0}</Text>
             
             <View style={styles.quantityContainer}>
               <TouchableOpacity
@@ -153,7 +125,7 @@ const CartScreen = () => {
                 <Ionicons name="remove" size={20} color={item.quantity <= 1 ? "#8E8E93" : "#007AFF"} />
               </TouchableOpacity>
 
-              <Text style={styles.quantity}>{item.quantity}</Text>
+              <Text style={styles.quantity}>{item.quantity || 1}</Text>
 
               <TouchableOpacity
                 style={[styles.quantityButton, isMaxQuantity && styles.quantityButtonDisabled]}
@@ -208,9 +180,9 @@ const CartScreen = () => {
       <Text style={styles.title}>Корзина</Text>
       
       <FlatList
-        data={cartItems}
+        data={cartItems.filter(item => item && item.id)}
         renderItem={renderCartItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => (item?.id || '').toString()}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />

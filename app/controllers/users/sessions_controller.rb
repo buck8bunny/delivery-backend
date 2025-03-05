@@ -13,7 +13,8 @@ class Users::SessionsController < ApplicationController
         user: {
           id: user.id,
           email: user.email,
-          name: user.name
+          name: user.name,
+          role: user.role
         }
       }, status: :ok
     else
@@ -31,7 +32,15 @@ class Users::SessionsController < ApplicationController
         user = User.find_by(id: user_id, jti: decoded_token[0]["jti"]) # Проверяем jti
   
         if user
-          render json: { valid: true, user: user }, status: :ok
+          render json: { 
+            valid: true, 
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role
+            } 
+          }, status: :ok
         else
           render json: { valid: false, message: "Invalid token" }, status: :unauthorized
         end
@@ -65,7 +74,12 @@ class Users::SessionsController < ApplicationController
       render json: {
         status: 'success',
         message: 'Token refreshed successfully',
-        data: user,
+        data: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        },
         token: token
       }, status: :ok
     rescue JWT::DecodeError

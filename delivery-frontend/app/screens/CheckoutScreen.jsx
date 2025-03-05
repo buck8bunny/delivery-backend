@@ -10,11 +10,13 @@ import {
 import { useStripe } from "@stripe/stripe-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { useCart } from '../context/CartContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const CheckoutScreen = () => {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { fetchCartItems } = useCart();
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [amount, setAmount] = useState(0);
@@ -155,6 +157,9 @@ const CheckoutScreen = () => {
               Authorization: `Bearer ${token}`,
             }
           });
+
+          // Обновляем состояние корзины после успешной оплаты
+          await fetchCartItems();
 
           Alert.alert(
             'Success!', 

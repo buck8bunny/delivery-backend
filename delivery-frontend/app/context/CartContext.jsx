@@ -15,15 +15,19 @@ export function CartProvider({ children }) {
       const response = await fetch(`${API_URL}/cart_items`, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Cart items loaded:', data.length);
         setCartItems(data);
       }
     } catch (error) {
       console.error('Error fetching cart items:', error);
+      setCartItems([]);
     }
   };
 
@@ -40,12 +44,49 @@ export function CartProvider({ children }) {
     return item ? item.id : null;
   };
 
-  const addToCart = (newItem) => {
-    setCartItems(prev => [...prev, newItem]);
+  const addToCart = async (productId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/cart_items`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ product_id: productId, quantity: 1 }),
+      });
+
+      if (response.ok) {
+        await fetchCartItems(); // Перезагружаем всю корзину
+      }
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+    }
   };
 
-  const removeFromCart = (itemId) => {
-    setCartItems(prev => prev.filter(item => item.id !== itemId));
+  const removeFromCart = async (itemId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/cart_items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        await fetchCartItems(); // Перезагружаем всю корзину
+      }
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+    }
   };
 
   return (

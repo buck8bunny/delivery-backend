@@ -13,10 +13,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "../context/UserContext";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const AuthScreen = ({ onLoginSuccess }) => {
+const LoginScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -26,6 +27,7 @@ const AuthScreen = ({ onLoginSuccess }) => {
   const [success, setSuccess] = useState(false);
   const [animation] = useState(new Animated.Value(0));
   const router = useRouter();
+  const { updateUserName } = useUser();
 
   useEffect(() => {
     Animated.timing(animation, {
@@ -35,6 +37,17 @@ const AuthScreen = ({ onLoginSuccess }) => {
     }).start();
   }, [isLogin]);
 
+  const handleNavigation = (role) => {
+    console.log('Начинаем навигацию для роли:', role);
+    if (role === 'admin') {
+      console.log('Переход на админ панель');
+      router.push('/(admin)/dashboard');
+    } else {
+      console.log('Переход на домашнюю страницу');
+      router.push('/(tabs)/home');
+    }
+  };
+
   // Проверка токена при монтировании
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,16 +56,22 @@ const AuthScreen = ({ onLoginSuccess }) => {
         try {
           const response = await fetch(`${API_URL}/auth/validate`, {
             method: "GET",
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
           });
 
           if (response.ok) {
-            router.push("/home");
+            const data = await response.json();
+            handleNavigation(data.user.role);
           } else {
-            await AsyncStorage.removeItem("token"); // Удаляем невалидный токен
+            await AsyncStorage.removeItem("token");
           }
         } catch (error) {
           console.error("Ошибка при проверке токена:", error);
+          await AsyncStorage.removeItem("token");
         }
       }
     };
@@ -76,10 +95,12 @@ const AuthScreen = ({ onLoginSuccess }) => {
       : `${API_URL}/users`;
   
     try {
+      console.log('Отправка запроса на:', url);
       const response = await fetch(url, {
         method: "POST",
         headers: { 
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Accept": "application/json"
         },
         body: JSON.stringify({
           user: {
@@ -91,12 +112,25 @@ const AuthScreen = ({ onLoginSuccess }) => {
       });
   
       const result = await response.json();
-      setLoading(false);
-  
+      console.log('Получен ответ:', result);
+      
       if (response.ok) {
         if (isLogin) {
+          // Сначала сохраняем токен
           await AsyncStorage.setItem("token", result.token);
-          onLoginSuccess(result); // Вызываем callback при успешной авторизации
+          console.log('Токен сохранен');
+          
+          // Затем сохраняем имя пользователя, если оно есть
+          if (result.user && result.user.name) {
+            await AsyncStorage.setItem("userName", result.user.name);
+            updateUserName(result.user.name);
+            console.log('Имя пользователя сохранено');
+          }
+          
+          // Используем функцию навигации
+          setTimeout(() => {
+            handleNavigation(result.user.role);
+          }, 100);
         } else {
           setSuccess(true);
           setMessage("Регистрация успешна!");
@@ -109,11 +143,12 @@ const AuthScreen = ({ onLoginSuccess }) => {
         setMessage(result.error || result.message || "Произошла ошибка.");
       }
     } catch (error) {
-      setLoading(false);
+      console.error("Login error:", error);
       setMessage("Ошибка сети, попробуйте снова.");
+    } finally {
+      setLoading(false);
     }
   };
-  
 
   return (
     <KeyboardAvoidingView
@@ -222,99 +257,91 @@ const AuthScreen = ({ onLoginSuccess }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  formContainer: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 16,
-  },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
+    container: {
+      flex: 1,
+      backgroundColor: "#F2F2F7",
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 24,
-    textAlign: "center",
-    color: "#000",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F2F2F7",
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 17,
-    color: "#000",
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  successButton: {
-    backgroundColor: "#34C759",
-  },
-  switchButton: {
-    marginTop: 16,
-    padding: 8,
-  },
-  switchText: {
-    color: "#007AFF",
-    fontSize: 15,
-    textAlign: "center",
-  },
-  messageContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  successMessage: {
-    backgroundColor: "#34C75920",
-  },
-  errorMessage: {
-    backgroundColor: "#FF3B3020",
-  },
-  messageText: {
-    marginLeft: 8,
-    fontSize: 15,
-  },
-  successText: {
-    color: "#34C759",
-  },
-  errorText: {
-    color: "#FF3B30",
-  },
-});
+    formContainer: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 16,
+    },
+    card: {
+      backgroundColor: "white",
+      borderRadius: 20,
+      padding: 24,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "bold",
+      marginBottom: 24,
+      textAlign: "center",
+      color: "#000",
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#F2F2F7",
+      borderRadius: 12,
+      marginBottom: 16,
+      paddingHorizontal: 12,
+    },
+    inputIcon: {
+      marginRight: 8,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 16,
+      fontSize: 17,
+      color: "#000",
+    },
+    button: {
+      backgroundColor: "#007AFF",
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    buttonText: {
+      color: "white",
+      fontSize: 17,
+      fontWeight: "600",
+    },
+    messageContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 16,
+    },
+    errorMessage: {
+      backgroundColor: "#FF3B3020",
+    },
+    messageText: {
+      marginLeft: 8,
+      fontSize: 15,
+    },
+    errorText: {
+      color: "#FF3B30",
+    },
+    switchButton: {
+      marginTop: 16,
+      padding: 8,
+    },
+    switchText: {
+      color: "#007AFF",
+      fontSize: 15,
+      textAlign: "center",
+    },
+  });
+  
 
-export default AuthScreen;
+export default LoginScreen; 
