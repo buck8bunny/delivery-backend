@@ -14,14 +14,25 @@ import { useRouter } from "expo-router";
 import { useUser } from "../context/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import AddToCartButton from "../components/AddToCartButton";
+import { useFocusEffect } from '@react-navigation/native';
+import { useCart } from '../context/CartContext';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const HomeScreen = () => {
   const router = useRouter();
   const { userName, updateUserName } = useUser();
+  const { fetchCartItems } = useCart();
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Обновляем корзину при фокусе на экране
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Home screen focused, updating cart...');
+      fetchCartItems();
+    }, [])
+  );
 
   useEffect(() => {
     const fetchUserName = async () => {

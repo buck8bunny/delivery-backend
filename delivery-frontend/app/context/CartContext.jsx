@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 export const CartContext = createContext();
@@ -34,6 +35,13 @@ export function CartProvider({ children }) {
   useEffect(() => {
     fetchCartItems();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Screen focused, updating cart...');
+      fetchCartItems();
+    }, [])
+  );
 
   const isInCart = (productId) => {
     return cartItems.some(item => item.product_id === productId);
