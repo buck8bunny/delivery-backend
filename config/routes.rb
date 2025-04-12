@@ -6,6 +6,14 @@ Rails.application.routes.draw do
     },
     defaults: { format: :json }
 
+  # Admin routes
+  namespace :admin do
+    get 'stats', to: 'dashboard#stats'
+    resources :products
+    resources :orders
+    resources :users
+  end
+
   # Оборачиваем маршрут refresh в devise_scope
   devise_scope :user do
     post '/refresh', to: 'users/sessions#refresh'

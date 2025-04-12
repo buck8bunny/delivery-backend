@@ -5,7 +5,7 @@ class Order < ApplicationRecord
 
   accepts_nested_attributes_for :order_items # ✅ Добавляем поддержку вложенных атрибутов
 
-  validates :status, presence: true, inclusion: { in: %w[pending completed failed] }
+  validates :status, presence: true, inclusion: { in: %w[pending completed failed cancelled] }
   validates :total, numericality: { greater_than_or_equal_to: 0 }
   validates :payment_intent_id, uniqueness: true, allow_nil: true
 

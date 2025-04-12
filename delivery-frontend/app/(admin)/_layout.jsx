@@ -1,50 +1,27 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#999',
-      }}
-    >
-      <Tabs.Screen
-        name="dashboard"
+    <Stack>
+      <Stack.Screen
+        name="(tabs)"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="new-product"
         options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="stats-chart" size={24} color={color} />
-          ),
+          presentation: 'modal',
+          headerShown: false
         }}
       />
-      <Tabs.Screen
-        name="products"
+      <Stack.Screen
+        name="edit-product/[id]"
         options={{
-          title: 'Products',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="cube" size={24} color={color} />
-          ),
+          presentation: 'modal',
+          headerShown: false
         }}
       />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="list" size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="users"
-        options={{
-          title: 'Users',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="people" size={24} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    </Stack>
   );
 }
